@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/output/buildings.dbf
+/output/buildings.shx
+/output/roads.dbf
+/output/buildings.shp
+/output/roads.shx
+/output/roads.shp
+/output/water.shp
+/output/water.dbf
