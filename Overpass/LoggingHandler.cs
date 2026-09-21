@@ -2,11 +2,7 @@ using System.Text;
 
 namespace OsmToShapefile.Overpass;
 
-/// <summary>
-/// Снимок реального HTTP-запроса, который уходит на провод: URI, HTTP-версия,
-/// все заголовки в порядке отправки и точное тело. Используется, чтобы
-/// сравнить wire-байты C#-клиента и PowerShell Invoke-WebRequest.
-/// </summary>
+
 internal sealed class LoggingHandler : DelegatingHandler
 {
     private readonly string _label;
@@ -23,10 +19,7 @@ internal sealed class LoggingHandler : DelegatingHandler
         sb.AppendLine($"--- {_label} ---");
         sb.AppendLine($"{request.Method} {request.RequestUri} HTTP/{request.Version}");
         foreach (var h in request.Headers)
-        {
-            // Каждое значение коллекции — отдельный токен HTTP. Если запятые внутри значения,
-            // они попадут на провод дословно, и сервер увидит невалидный заголовок.
-            var raw = string.Join(",", h.Value);
+        {            var raw = string.Join(",", h.Value);
             sb.AppendLine($"{h.Key}: [{string.Join(" | ", h.Value)}] (joined: {raw})");
         }
         if (request.Content is not null)

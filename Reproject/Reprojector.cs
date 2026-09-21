@@ -4,10 +4,6 @@ using ProjNet.CoordinateSystems.Transformations;
 
 namespace OsmToShapefile.Reproject;
 
-/// <summary>
-/// Репроекция координат WGS84 → целевая метрическая SRS (UTM-зона).
-/// Создаёт CoordinateTransformation лениво, переиспользует при повторных вызовах.
-/// </summary>
 public sealed class Reprojector
 {
     private readonly ICoordinateTransformation _wgs84ToTarget;
@@ -44,9 +40,6 @@ public sealed class Reprojector
         return new Coordinate(x, y);
     }
 
-    /// <summary>
-    /// Репроецирует координаты геометрии "in place" через ICoordinateFilter.
-    /// </summary>
     public Geometry TransformGeometry(Geometry src)
     {
         src.Apply(new ReprojectFilter(this));

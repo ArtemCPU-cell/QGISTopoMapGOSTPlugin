@@ -1,8 +1,5 @@
 namespace OsmToShapefile.Cli;
 
-/// <summary>
-/// Распарсенные аргументы CLI. Парсер — наш, ручной: аргументов мало, никаких зависимостей.
-/// </summary>
 public sealed record RunOptions(
     OsmToShapefile.Overpass.BoundingBox BBox,
     OsmToShapefile.Scale.MapScale Scale,

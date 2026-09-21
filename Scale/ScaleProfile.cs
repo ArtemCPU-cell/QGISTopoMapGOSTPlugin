@@ -1,9 +1,6 @@
 namespace OsmToShapefile.Scale;
 
-/// <summary>
-/// Числовые пороги для конкретного масштаба (по мотивам ГОСТ и условных обозначений).
-/// Все метрические пороги — в целевой метрической SRS (метры).
-/// </summary>
+
 public sealed record ScaleProfile(
     int ScaleDenominator,
     string SldTitle,
@@ -13,10 +10,6 @@ public sealed record ScaleProfile(
     double ContourIntervalMeters,
     double MinFeatureLengthMeters)
 {
-    /// <summary>
-    /// Профиль для масштаба. Все поля — производные от знаменателя,
-    /// поэтому их можно менять централизованно.
-    /// </summary>
     public static ScaleProfile For(MapScale scale) => scale switch
     {
         MapScale.Scale10k => new ScaleProfile(

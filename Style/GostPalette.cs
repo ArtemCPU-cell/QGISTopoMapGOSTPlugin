@@ -1,9 +1,5 @@
 namespace OsmToShapefile.Style;
 
-/// <summary>
-/// Условные цвета топокарты "по мотивам ГОСТ". Не канон, но близко к тому, что
-/// ожидается от листа 1:25 000–1:100 000 в QGIS.
-/// </summary>
 public static class GostPalette
 {
     // Гидрография

@@ -5,13 +5,6 @@ using OsmToShapefile.Scale;
 
 namespace OsmToShapefile.Geo.Hydrology;
 
-/// <summary>
-/// Превращает элементы Overpass по гидрографическим тегам в набор слоёв:
-/// - water_polygon (озёра, широкие реки)
-/// - water_line (узкие реки, ручьи, каналы)
-/// - wetlands (болота, отдельный слой)
-/// Граница между "широкой" и "узкой" рекой — ширина из ScaleProfile.
-/// </summary>
 public static class HydrologyBuilder
 {
     private static readonly GeometryFactory Factory = new(new PrecisionModel(), 4326);
@@ -39,22 +32,17 @@ public static class HydrologyBuilder
             var tags = el.Tags ?? new Dictionary<string, string>();
             var isClosed = coords.Length >= 4 && coords[0].Equals2D(coords[^1]);
 
-            // natural=wetland — всегда отдельный полигональный слой.
             if (tags.TryGetValue("natural", out var naturalVal) && naturalVal == "wetland" && isClosed)
             {
                 wetlands.Add(BuildFeature(Factory.CreatePolygon(coords), tags, el.Id, "wetland", profile));
                 continue;
             }
 
-            // natural=water (озеро/пруд) — это всегда полигон.
             if (naturalVal == "water" && isClosed)
             {
                 polys.Add(BuildFeature(Factory.CreatePolygon(coords), tags, el.Id, "waterbody", profile));
                 continue;
             }
-
-            // waterway=river — узкая → линия, широкая → полигон. В OSM часто
-            // есть тег width в метрах; если нет, считаем реку узкой и рисуем линией.
             if (tags.TryGetValue("waterway", out var waterwayVal))
             {
                 switch (waterwayVal)
@@ -88,8 +76,7 @@ public static class HydrologyBuilder
 
     private static double? ParseWidth(Dictionary<string, string> tags)
     {
-        // OSM хранит ширину как "width=12" (в метрах) или "width=12 m".
-        // width=* не всегда есть, тогда считаем реку узкой.
+
         if (!tags.TryGetValue("width", out var raw))
             return null;
 

@@ -3,17 +3,10 @@ using OsmToShapefile.Scale;
 
 namespace OsmToShapefile.Style;
 
-/// <summary>
-/// Фабрики SLD-стилей по слоям. Один источник истины для того, как
-/// каждый слой выглядит в QGIS.
-/// </summary>
 public static class SldStyleFactory
 {
-    /// <summary>Класс дороги → ширина линии в мм. Зависит от масштаба.</summary>
     public static SldStyle Roads(ScaleProfile profile)
     {
-        // На более крупных масштабах — тоньше.
-        // Подобрано на глаз для 1:25 000–1:200 000.
         var mult = ScaleMultiplier(profile);
         var rules = new List<SldRule>
         {

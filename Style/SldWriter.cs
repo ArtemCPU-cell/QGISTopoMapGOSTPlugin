@@ -3,10 +3,6 @@ using System.Text;
 
 namespace OsmToShapefile.Style;
 
-/// <summary>
-/// Пишет .sld (Styled Layer Descriptor, OGC SLD 1.1) для шейпфайлов.
-/// На каждый слой — свой файл с именем "{layerName}.sld". QGIS и ArcGIS читают оба.
-/// </summary>
 public static class SldWriter
 {
     public static void Write(string outputDir, string layerName, SldStyle style)
@@ -101,9 +97,6 @@ public static class SldWriter
     private static string Esc(string s) => System.Security.SecurityElement.Escape(s);
 }
 
-/// <summary>
-/// Описание SLD для одного слоя: набор правил по классам объектов.
-/// </summary>
 public sealed record SldStyle(IReadOnlyList<SldRule> Rules);
 
 public sealed record SldRule(

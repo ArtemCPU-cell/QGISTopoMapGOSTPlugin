@@ -1,9 +1,6 @@
 namespace OsmToShapefile.Geo.Hydrology;
 
-/// <summary>
-/// Тип водного объекта. Нужен, чтобы в SLD отличать широкие реки (полигон)
-/// от узких (линия) и от болот.
-/// </summary>
+
 public enum WaterKind
 {
     RiverWide,        // waterway=river или natural=water, ширина >= порога масштаба

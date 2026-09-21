@@ -16,7 +16,6 @@ using OsmToShapefile.Scale;
 using OsmToShapefile.Style;
 using OsmToShapefile.Tiling;
 
-// --- Разбор CLI ---
 RunOptions opts;
 try
 {
@@ -34,7 +33,6 @@ var profile = ScaleProfile.For(opts.Scale);
 var reprojector = new Reprojector(opts.TargetSrs);
 Console.WriteLine($"Целевая SRS: {opts.TargetSrs}, WKT длина {reprojector.TargetWkt.Length} симв.");
 
-// --- Список слоёв Overpass ---
 var roadsLayer = new LayerDefinition("roads", "highway", null, GeometryKind.Line, ExtraValues: null, IncludeRelations: false);
 var buildingsLayer = new LayerDefinition("buildings", "building", null, GeometryKind.Polygon);
 var waterLayer = new LayerDefinition("water", "natural", null!, GeometryKind.Polygon, ExtraValues: new[] { "water", "river", "stream", "canal" });
@@ -49,7 +47,6 @@ Directory.CreateDirectory(opts.OutputDir);
 
 var client = new OverpassClient();
 
-// === ДОРОГИ ===
 {
     var features = await ProcessLayerAsync(roadsLayer, "roads", profile, opts, sampleDataDir, client,
         (response, p) =>
@@ -78,7 +75,6 @@ var client = new OverpassClient();
         SldStyleFactory.Roads(profile));
 }
 
-// === ЗДАНИЯ ===
 {
     var features = await ProcessLayerAsync(buildingsLayer, "buildings", profile, opts, sampleDataDir, client,
         (response, p) => BuildingBuilder.Build(response));
@@ -86,7 +82,6 @@ var client = new OverpassClient();
         SldStyleFactory.Buildings());
 }
 
-// === ГИДРОГРАФИЯ ===
 {
     var features = await ProcessLayerAsync(waterLayer, "water", profile, opts, sampleDataDir, client,
         (response, p) =>
@@ -102,7 +97,6 @@ var client = new OverpassClient();
         SldStyleFactory.WaterPolygons(profile));
 }
 
-// === РАСТИТЕЛЬНОСТЬ/ГРУНТЫ ===
 {
     var features = await ProcessLayerAsync(vegetationLayer, "vegetation", profile, opts, sampleDataDir, client,
         (response, p) =>
@@ -114,7 +108,6 @@ var client = new OverpassClient();
         SldStyleFactory.Forest());
 }
 
-// === НАСЕЛЁННЫЕ ПУНКТЫ ===
 {
     var features = await ProcessLayerAsync(placesLayer, "places", profile, opts, sampleDataDir, client,
         (response, p) => SettlementBuilder.Build(response));
@@ -122,7 +115,6 @@ var client = new OverpassClient();
         SldStyleFactory.Settlements());
 }
 
-// === DEM + ГОРИЗОНТАЛИ ===
 if (!opts.NoDem)
 {
     Console.WriteLine("DEM: запрашиваю SRTM 30м через opentopodata.org...");
@@ -147,7 +139,7 @@ else
     Console.WriteLine("DEM пропущен (--no-dem).");
 }
 
-// === QGIS-проект (опционально) ===
+
 if (opts.QgisProject)
 {
     var name = Path.GetFileName(opts.OutputDir.TrimEnd('/', '\\'));
@@ -167,7 +159,6 @@ if (opts.QgisProject)
 Console.WriteLine("Готово.");
 return 0;
 
-// === Локальные функции ===
 
 async Task<List<Feature>> ProcessLayerAsync(
     LayerDefinition layer, string key,
@@ -192,7 +183,7 @@ async Task<List<Feature>> ProcessLayerAsync(
             else
             {
                 Console.WriteLine($"[{key}] Overpass {tile}...");
-                var layerTile = layer with { }; // копия для журнала, если нужно
+                var layerTile = layer with { };
                 _ = layerTile;
                 response = await client.FetchLayerAsync(tile, layer);
             }
@@ -204,9 +195,6 @@ async Task<List<Feature>> ProcessLayerAsync(
         {
             Console.Error.WriteLine($"[{key}] тайл {tile}: {ex.Message}");
         }
-
-        // 30 секунд между Overpass-запросами — на 2-м тяжёлом запросе main-зеркало
-        // начинает возвращать 429 Too Many Requests, и этого хватает для остывания.
         if (tiles.Count > 1)
             await Task.Delay(TimeSpan.FromSeconds(30));
     }
@@ -216,36 +204,14 @@ async Task<List<Feature>> ProcessLayerAsync(
 void WriteFeaturesWithStyle(string outputDir, string layerName, List<Feature> features,
     SldStyle style)
 {
-    // Репроекция WGS84 → целевая метрическая SRS.
     foreach (var f in features)
         reprojector.TransformGeometry(f.Geometry);
-
-    // Генерализация на уровне масштаба.
-    //
-    // ВАЖНО: для полигонов используем TopologyPreservingSimplifier, а не обычный
-    // DouglasPeuckerSimplifier. Обычный DP для маленьких полигонов (типичное здание —
-    // прямоугольник из 4-5 точек) при достаточно грубом допуске может схлопнуть контур
-    // до пустой/невалидной геометрии (< 4 точек в кольце), молча вернув IsEmpty==true
-    // вместо ошибки. Такая пустая геометрия среди нормальных полигонов ломает запись
-    // в shapefile — ShapefileDataWriter пишет её как некорректный Null Shape (shape_type=0)
-    // с неверной длиной записи, из-за чего съезжают смещения всех последующих записей
-    // и оставшаяся часть файла превращается в мусор (проверено на реальном примере:
-    // buildings.shp обрывался на записи #1204 из тысяч именно так).
-    // TopologyPreservingSimplifier гарантирует, что результат остаётся валидным
-    // полигоном и не схлопывается ниже минимума точек. Для линий (дороги, горизонтали)
-    // риска нет — там достаточно 2 точек, оставляем обычный Douglas-Peucker.
     foreach (var f in features)
     {
         f.Geometry = f.Geometry is Polygon or MultiPolygon
             ? TopologyPreservingSimplifier.Simplify(f.Geometry, profile.DouglasPeuckerToleranceMeters)
             : OsmToShapefile.Geo.Generalizer.DouglasPeuckerSimplifier.Simplify(f.Geometry, profile.DouglasPeuckerToleranceMeters);
     }
-
-    // Страховка: даже с TopologyPreservingSimplifier где-то ниже по пайплайну
-    // (например, при клиппинге по границе тайла в BboxTiler) может появиться
-    // вырожденная геометрия. Одна такая запись повреждает весь остальной файл —
-    // поэтому отфильтровываем пустые/невалидные геометрии перед записью, а не
-    // передаём их в ShapefileWriter как есть.
     var before = features.Count;
     features = features.Where(f => f.Geometry is { IsEmpty: false } and { IsValid: true }).ToList();
     if (features.Count < before)

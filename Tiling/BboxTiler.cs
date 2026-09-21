@@ -2,17 +2,12 @@ using OsmToShapefile.Overpass;
 
 namespace OsmToShapefile.Tiling;
 
-/// <summary>
-/// Режет большой bbox на квадраты side×side, чтобы не упереться в лимит Overpass
-/// (~0.25° по короткой стороне для тяжёлых bbox) и в тайм-аут ответа.
-/// Параллельность обработки тайлов — на стороне вызывающего.
-/// </summary>
+
 public static class BboxTiler
 {
-    public const double MaxOverpassSideDegrees = 0.20; // чуть меньше лимита, чтобы был запас
+    public const double MaxOverpassSideDegrees = 0.20;
     public const double TileOverlapDegrees = 0.005;
 
-    /// <summary>Возвращает тайлы bbox, покрывающие исходный, в порядке с юго-запада на северо-восток.</summary>
     public static IReadOnlyList<BoundingBox> Tile(BoundingBox bbox)
     {
         var dLat = bbox.North - bbox.South;

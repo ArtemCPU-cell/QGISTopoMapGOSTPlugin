@@ -22,7 +22,7 @@ public static class BuildingBuilder
 
             var isClosed = coords.Length >= 4 && coords[0].Equals2D(coords[^1]);
             if (!isClosed)
-                continue; // не-замкнутый building — пропускаем (некорректная геометрия)
+                continue; 
 
             var tags = el.Tags ?? new Dictionary<string, string>();
             var attrs = new AttributesTable
@@ -41,10 +41,6 @@ public static class SettlementBuilder
 {
     private static readonly GeometryFactory Factory = new(new PrecisionModel(), 4326);
 
-    /// <summary>
-    /// Наслённые пункты: place=city|town|village|hamlet|suburb — точечный слой.
-    /// Overpass отдаёт такие объекты как node, у которого есть Lat/Lon.
-    /// </summary>
     public static List<Feature> Build(OverpassResponse response)
     {
         var features = new List<Feature>();

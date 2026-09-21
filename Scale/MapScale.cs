@@ -1,8 +1,5 @@
 namespace OsmToShapefile.Scale;
 
-/// <summary>
-/// Поддерживаемые масштабы. Цифры — знаменатель (10k → 1:10 000).
-/// </summary>
 public enum MapScale
 {
     Scale10k = 10000,

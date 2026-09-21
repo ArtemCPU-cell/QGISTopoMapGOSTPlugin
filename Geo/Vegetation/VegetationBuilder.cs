@@ -4,14 +4,11 @@ using OsmToShapefile.Overpass;
 
 namespace OsmToShapefile.Geo.Vegetation;
 
-/// <summary>
-/// Категории растительности/грунтов. Маппинг OSM → GOST-подобные обозначения.
-/// </summary>
+
 public static class VegetationClassifier
 {
     public static string? Classify(IReadOnlyDictionary<string, string> tags)
     {
-        // landuse — наиболее частый источник для лесов/полей.
         if (tags.TryGetValue("landuse", out var lu))
         {
             return lu switch
@@ -26,7 +23,6 @@ public static class VegetationClassifier
             };
         }
 
-        // natural — лес и кустарник чаще всего помечены именно так.
         if (tags.TryGetValue("natural", out var nat))
         {
             return nat switch
@@ -49,10 +45,6 @@ public static class VegetationBuilder
 {
     private static readonly GeometryFactory Factory = new(new PrecisionModel(), 4326);
 
-    /// <summary>
-    /// Группирует результат Overpass по типу растительности.
-    /// Возвращает словарь "forest", "meadow", ... → список фич.
-    /// </summary>
     public static Dictionary<string, List<Feature>> Build(OverpassResponse response)
     {
         var byClass = new Dictionary<string, List<Feature>>();

@@ -3,11 +3,6 @@ using NetTopologySuite.Geometries;
 
 namespace OsmToShapefile.Dem;
 
-/// <summary>
-/// Изолинии по сетке высот (marching squares). Возвращает Feature с двумя атрибутами:
-/// "kind" = "regular" | "index" и "elevation" в метрах.
-/// index — каждая 5-я горизонталь (для подписи).
-/// </summary>
 public static class ContourGenerator
 {
     public sealed record ContourSet(List<Feature> Lines);
@@ -28,7 +23,6 @@ public static class ContourGenerator
         if (double.IsInfinity(minH) || double.IsInfinity(maxH))
             return new ContourSet(features);
 
-        // Округляем min/max вниз/вверх до шага, чтобы горизонтали шли по круглой высоте.
         var zStart = Math.Floor(minH / intervalMeters) * intervalMeters;
         var zEnd   = Math.Ceiling(maxH / intervalMeters) * intervalMeters;
 
@@ -53,7 +47,6 @@ public static class ContourGenerator
                     var lat0 = grid.Lats[row];
                     var lat1 = grid.Lats[row + 1];
 
-                    // Точки пересечения горизонтали z с рёбрами квадрата.
                     var pts = new List<Coordinate>();
                     AddIfCross(pts, lon0, lat0, lon1, lat0, h00, h10, z); // верхняя
                     AddIfCross(pts, lon1, lat0, lon1, lat1, h10, h11, z); // правая
@@ -73,7 +66,6 @@ public static class ContourGenerator
                     }
                     else if (pts.Count > 2)
                     {
-                        // Седло: рисуем несколько сегментов.
                         for (var i = 0; i < pts.Count; i += 2)
                         {
                             if (i + 1 >= pts.Count) break;

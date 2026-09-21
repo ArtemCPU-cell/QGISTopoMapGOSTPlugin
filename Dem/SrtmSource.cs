@@ -1,15 +1,11 @@
 using System.Globalization;
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using OsmToShapefile.Overpass;
 
 namespace OsmToShapefile.Dem;
 
-/// <summary>
-/// DEM через opentopodata.org (SRTM 30м, глобально до ~60°N).
-/// Отдаёт высоты по сетке (lat, lon) точек, до 100 точек на запрос.
-/// </summary>
+
 public sealed class SrtmSource
 {
     private readonly HttpClient _http;
@@ -24,11 +20,6 @@ public sealed class SrtmSource
         if (!_http.DefaultRequestHeaders.Contains("User-Agent"))
             _http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "curl/8.4.0");
     }
-
-    /// <summary>
-    /// Возвращает сетку высот (north->south, west->east) с заданным шагом в градусах.
-    /// Шаг ~0.0003° ≈ 33 м — соответствует SRTM 30м номинально.
-    /// </summary>
     public async Task<DemGrid> FetchGridAsync(BoundingBox bbox, double stepDeg,
         IProgress<string>? log = null, CancellationToken ct = default)
     {
@@ -42,7 +33,7 @@ public sealed class SrtmSource
 
         var flat = new List<double>();
         var total = lats.Count * lons.Count;
-        var batchSize = 100; // opentopodata лимит
+        var batchSize = 100; 
 
         log?.Report($"DEM: сетка {lats.Count}x{lons.Count}={total} точек");
 
@@ -65,11 +56,9 @@ public sealed class SrtmSource
             foreach (var r in body?.Results ?? new())
                 flat.Add(r.Elevation ?? double.NaN);
 
-            // 1 запрос/сек — лимит opentopodata для анонимных.
             await Task.Delay(1100, ct);
         }
 
-        // Если усекли — добьём NaN до ровной матрицы.
         while (flat.Count < total) flat.Add(double.NaN);
         if (flat.Count > total) flat = flat.GetRange(0, total);
 
