@@ -22,7 +22,7 @@ public sealed record RunOptions(
 
         Опции:
           --srs <epsg>         целевая метрическая SRS (по умолчанию EPSG:32637)
-          --offline            не обращаться к сети; читать sample-data/*.json и пропустить DEM
+          --offline            не обращаться к Overpass; читать sample-data/*.json
           --no-dem             пропустить загрузку SRTM и построение горизонталей
           --qgis-project       сгенерировать .qgs со ссылками на слои
 

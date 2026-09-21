@@ -27,8 +27,26 @@ public sealed class OverpassElement
     [JsonPropertyName("geometry")]
     public List<GeoPoint>? Geometry { get; set; }
 
+    [JsonPropertyName("members")]
+    public List<OverpassMember>? Members { get; set; }
+
     [JsonPropertyName("tags")]
     public Dictionary<string, string>? Tags { get; set; }
+}
+
+public sealed class OverpassMember
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("ref")]
+    public long Ref { get; set; }
+
+    [JsonPropertyName("role")]
+    public string Role { get; set; } = string.Empty;
+
+    [JsonPropertyName("geometry")]
+    public List<GeoPoint>? Geometry { get; set; }
 }
 
 public sealed class GeoPoint

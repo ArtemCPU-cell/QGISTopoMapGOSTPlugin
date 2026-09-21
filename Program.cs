@@ -35,7 +35,8 @@ var reprojector = new Reprojector(opts.TargetSrs);
 Console.WriteLine($"Целевая SRS: {opts.TargetSrs}, WKT длина {reprojector.TargetWkt.Length} симв.");
 
 var roadsLayer = new LayerDefinition("roads", "highway", null, GeometryKind.Line, ExtraValues: null, IncludeRelations: false);
-var buildingsLayer = new LayerDefinition("buildings", "building", null, GeometryKind.Polygon);
+var buildingsLayer = new LayerDefinition(
+    "buildings", "building", null, GeometryKind.Polygon, IncludeRelations: true);
 var waterLayer = new LayerDefinition("water", "natural", null!, GeometryKind.Polygon, ExtraValues: new[] { "water", "river", "stream", "canal" });
 var vegetationLayer = new LayerDefinition("vegetation", "landuse", null!, GeometryKind.Polygon,
     ExtraValues: new[] { "forest", "wood", "scrub", "grassland", "meadow", "farmland", "sand", "beach", "rock", "cliff", "bare_rock", "vineyard", "orchard", "cemetery" },
@@ -118,7 +119,7 @@ var client = new OverpassClient();
         SldStyleFactory.Settlements());
 }
 
-if (!opts.NoDem && !opts.Offline)
+if (!opts.NoDem)
 {
     Console.WriteLine("DEM: запрашиваю SRTM 30м через opentopodata.org...");
     try
@@ -136,10 +137,6 @@ if (!opts.NoDem && !opts.Offline)
     {
         Console.Error.WriteLine($"DEM: ошибка — {ex.Message}");
     }
-}
-else if (opts.Offline)
-{
-    Console.WriteLine("DEM пропущен (--offline).");
 }
 else
 {

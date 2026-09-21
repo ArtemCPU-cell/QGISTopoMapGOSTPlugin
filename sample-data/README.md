@@ -1,18 +1,18 @@
-﻿# Offline Overpass sample data
+# Offline Overpass sample data
 
 These are raw JSON responses from Overpass for bbox `55.75,37.60,55.77,37.64` (central Moscow), downloaded on **21 September 2026**. They are used by `dotnet run -- --offline ...` so geometry/shapefile work can be tested without a public Overpass server.
 
 | File | Query result |
 | --- | ---: |
 | `roads.json` | 10,432 ways |
-| `buildings.json` | 1,905 ways |
+| `buildings.json` | 1,905 ways + 1,051 multipolygon relations |
 | `water.json` | 12 ways |
 | `vegetation.json` | 0 ways |
 | `places.json` | 2 nodes |
 
 `vegetation.json` is deliberately an actual empty Overpass response for this bbox and the current `landuse` value set, not a placeholder.
 
-The queries below are generated from `LayerDefinition` in `Program.cs`. A point layer is queried as `node`; line and polygon layers are queried as `way`.
+The queries below are generated from `LayerDefinition` in `Program.cs`. A point layer is queried as `node`; line and polygon layers are queried as `way` (building layers also include `relation`).
 
 ## roads.json
 
@@ -30,6 +30,7 @@ out geom;
 [out:json][timeout:90];
 (
   way["building"](55.75,37.60,55.77,37.64);
+  relation["building"](55.75,37.60,55.77,37.64);
 );
 out geom;
 ```
