@@ -27,7 +27,8 @@ catch (Exception ex)
     return 1;
 }
 
-Console.WriteLine($"OsmToShapeFile: bbox={opts.BBox}, scale={opts.Scale}, srs={opts.TargetSrs}, output={opts.OutputDir}");
+Console.WriteLine(
+    $"OsmToShapeFile: bbox={opts.BBox}, scale={opts.Scale}, srs={opts.TargetSrs}, output={opts.OutputDir}, offline={opts.Offline}");
 
 var profile = ScaleProfile.For(opts.Scale);
 var reprojector = new Reprojector(opts.TargetSrs);
@@ -42,7 +43,9 @@ var vegetationLayer = new LayerDefinition("vegetation", "landuse", null!, Geomet
 var placesLayer = new LayerDefinition("places", "place", null, GeometryKind.Point,
     ExtraValues: new[] { "city", "town", "village", "hamlet", "suburb", "borough" });
 
-var sampleDataDir = Path.Combine(Directory.GetCurrentDirectory(), "sample-data");
+var sampleDataDir = Path.Combine(AppContext.BaseDirectory, "sample-data");
+if (opts.Offline)
+    Console.WriteLine($"Офлайн-кэш: {sampleDataDir}");
 Directory.CreateDirectory(opts.OutputDir);
 
 var client = new OverpassClient();
@@ -115,7 +118,7 @@ var client = new OverpassClient();
         SldStyleFactory.Settlements());
 }
 
-if (!opts.NoDem)
+if (!opts.NoDem && !opts.Offline)
 {
     Console.WriteLine("DEM: запрашиваю SRTM 30м через opentopodata.org...");
     try
@@ -133,6 +136,10 @@ if (!opts.NoDem)
     {
         Console.Error.WriteLine($"DEM: ошибка — {ex.Message}");
     }
+}
+else if (opts.Offline)
+{
+    Console.WriteLine("DEM пропущен (--offline).");
 }
 else
 {
@@ -174,8 +181,15 @@ async Task<List<Feature>> ProcessLayerAsync(
         try
         {
             OverpassResponse response;
-            if (opts.Offline && File.Exists(localFile))
+            if (opts.Offline)
             {
+                if (!File.Exists(localFile))
+                {
+                    throw new FileNotFoundException(
+                        $"Офлайн-режим включён, но кэш слоя '{key}' не найден. " +
+                        $"Ожидался файл: {localFile}");
+                }
+
                 if (all.Count == 0)
                     Console.WriteLine($"[{key}] офлайн: {localFile}");
                 response = await OverpassClient.LoadFromFileAsync(localFile);
