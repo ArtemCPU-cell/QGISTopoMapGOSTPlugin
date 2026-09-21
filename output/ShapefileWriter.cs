@@ -36,6 +36,10 @@ public static class ShapefileWriter
 
         // 1) Строим header DBF по схеме атрибутов первой фичи.
         var header = BuildDbaseHeader(features[0], Encoding.UTF8);
+        // DbaseFileWriter writes this value verbatim and does not update it while
+        // records are appended. A zero count makes GIS readers treat the table (and
+        // therefore the associated shapefile layer) as empty.
+        header.NumRecords = features.Count;
 
         // 2) Пишем SHP+SHX через NTS — геометрия и индекс.
         var shpHeader = ShapefileDataWriter.GetHeader(features[0], features.Count);
