@@ -1,9 +1,9 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace OsmToShapefile.Overpass;
-
 
 public readonly record struct BoundingBox(double South, double West, double North, double East)
 {
@@ -28,12 +28,14 @@ public enum GeometryKind
 
 public sealed class OverpassClient
 {
+    private const int RetryAttemptsPerMirror = 3;
+    private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(2);
+
     private static readonly string[] MirrorUrls =
     {
         "https://overpass-api.de/api/interpreter",
-        
         "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-
         "https://overpass.kumi.systems/api/interpreter",
     };
 
@@ -46,33 +48,24 @@ public sealed class OverpassClient
             var handler = new HttpClientHandler
             {
                 SslProtocols = System.Security.Authentication.SslProtocols.Tls12
-                                | System.Security.Authentication.SslProtocols.Tls13,
-
+                               | System.Security.Authentication.SslProtocols.Tls13,
                 AutomaticDecompression = DecompressionMethods.GZip
-                                          | DecompressionMethods.Deflate
-                                          | DecompressionMethods.Brotli
+                                         | DecompressionMethods.Deflate
+                                         | DecompressionMethods.Brotli
             };
 
             httpClient = new HttpClient(handler);
         }
 
         _httpClient = httpClient;
-        _httpClient.Timeout = TimeSpan.FromSeconds(15);
+        _httpClient.Timeout = RequestTimeout;
 
-        // Только User-Agent. Полный "браузерный" набор заголовков (Sec-Fetch-*, sec-ch-ua-*,
-        // Accept-Language, Origin, Referer, Cache-Control) раньше ломал обработку на
-        // overpass-api.de: запрос уходил без ошибок, но сервер через десятки секунд отвечал
-        // remark "Query timed out" или "out of memory", хотя curl с тем же bbox отвечал 200 OK
-        // за 2-4 секунды. Проверено: bare curl без заголовков вообще — 200, curl только с
-        // User-Agent: curl/8.4.0 — тоже 200. Значит, лишние заголовки запускают на сервере
-        // какой-то "досрочный/облегчённый" путь обработки.
-        // Accept: application/json ПЕРВЫМ — Overpass отдаёт только application/json
-        // и application/osm3s+xml. С "*/*" без преференции некоторые зеркала (особенно
-        // mail.ru) отвечают 406 Not Acceptable. С явным application/json первым —
-        // 200 OK, подтверждено.
+        // Overpass accepts a regular form POST. Do not imitate a browser: the previous
+        // claim that browser-only headers changed server-side query execution was not
+        // backed by a reproducible capture. Keep only stable API negotiation headers.
         var headers = _httpClient.DefaultRequestHeaders;
         if (!headers.Contains("User-Agent"))
-            headers.TryAddWithoutValidation("User-Agent", "curl/8.4.0");
+            headers.TryAddWithoutValidation("User-Agent", "OsmToShapefile/1.0 (+https://github.com/ArtemCPU-cell/QGISTopoMapGOSTPlugin)");
         headers.Accept.Clear();
         headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json", 1.0));
         headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*", 0.1));
@@ -84,6 +77,7 @@ public sealed class OverpassClient
         var parsed = await JsonSerializer.DeserializeAsync<OverpassResponse>(stream, cancellationToken: ct);
         return parsed ?? new OverpassResponse();
     }
+
     public async Task<OverpassResponse> FetchLayerAsync(BoundingBox bbox, LayerDefinition layer, CancellationToken ct = default)
     {
         var query = BuildQuery(bbox, layer);
@@ -91,51 +85,86 @@ public sealed class OverpassClient
 
         foreach (var url in MirrorUrls)
         {
-            try
+            for (var attempt = 1; attempt <= RetryAttemptsPerMirror; attempt++)
             {
-                var formData = new List<KeyValuePair<string, string>>
+                try
                 {
-                    new("data", query)
-                };
-                using var content = new FormUrlEncodedContent(formData);
+                    using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                    {
+                        Content = new FormUrlEncodedContent(
+                            new[] { new KeyValuePair<string, string>("data", query) })
+                    };
 
-                using var response = await _httpClient.PostAsync(url, content, ct);
-                if ((int)response.StatusCode == 429 || response.StatusCode == HttpStatusCode.ServiceUnavailable)
-                {
-                    response.Dispose();
-                    Console.WriteLine($"  {url}: {response.StatusCode}, жду 20с и повторяю...");
-                    await Task.Delay(TimeSpan.FromSeconds(20), ct);
-                    continue;
+                    var stopwatch = Stopwatch.StartNew();
+                    using var response = await _httpClient.SendAsync(
+                        request, HttpCompletionOption.ResponseHeadersRead, ct);
+                    stopwatch.Stop();
+
+                    Console.WriteLine(
+                        $"  {url}: HTTP {(int)response.StatusCode} {response.ReasonPhrase} in {stopwatch.Elapsed.TotalSeconds:F1}s (attempt {attempt}/{RetryAttemptsPerMirror})");
+
+                    if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
+                    {
+                        lastError = new HttpRequestException($"{url}: {response.StatusCode}");
+                        if (attempt == RetryAttemptsPerMirror)
+                            break;
+
+                        var delay = GetRetryDelay(response);
+                        Console.WriteLine($"  {url}: retrying this mirror after {delay.TotalSeconds:F0}s.");
+                        await Task.Delay(delay, ct);
+                        continue;
+                    }
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var details = await ReadResponseSnippetAsync(response, ct);
+                        throw new HttpRequestException($"{url}: {response.StatusCode}. {details}".TrimEnd());
+                    }
+
+                    await using var json = await response.Content.ReadAsStreamAsync(ct);
+                    var parsed = await JsonSerializer.DeserializeAsync<OverpassResponse>(json, cancellationToken: ct)
+                                 ?? new OverpassResponse();
+
+                    if (!string.IsNullOrWhiteSpace(parsed.Remark))
+                        throw new InvalidOperationException($"Overpass remark: {parsed.Remark}");
+
+                    Console.WriteLine($"  {url}: received {parsed.Elements.Count} elements.");
+                    return parsed;
                 }
-                if (response.StatusCode == HttpStatusCode.BadRequest ||
-                    response.StatusCode == HttpStatusCode.NotAcceptable)
+                catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
                 {
-                    response.Dispose();
-                    throw new HttpRequestException(
-                        $"{url}: {response.StatusCode} (запрос невалиден для зеркала)");
+                    lastError = ex;
+                    Console.WriteLine($"  mirror {url} failed ({ex.Message}).");
+                    break;
                 }
-
-                response.EnsureSuccessStatusCode();
-
-                var json = await response.Content.ReadAsStreamAsync(ct);
-                var parsed = await JsonSerializer.DeserializeAsync<OverpassResponse>(json, cancellationToken: ct);
-                parsed ??= new OverpassResponse();
-
-                if (!string.IsNullOrEmpty(parsed.Remark))
-                {
-                    throw new InvalidOperationException($"Overpass вернул remark: {parsed.Remark}");
-                }
-
-                return parsed;
             }
-            catch (Exception ex)
-            {
-                lastError = ex;
-                Console.WriteLine($"  зеркало {url} не ответило ({ex.Message}), пробую следующее...");
-            }
+
+            Console.WriteLine($"  switching from {url} to the next mirror.");
         }
 
-        throw new InvalidOperationException("Все зеркала Overpass недоступны.", lastError);
+        throw new InvalidOperationException("All Overpass mirrors are unavailable.", lastError);
+    }
+
+    private static TimeSpan GetRetryDelay(HttpResponseMessage response)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        if (retryAfter?.Delta is { } delta && delta > TimeSpan.Zero)
+            return delta;
+        if (retryAfter?.Date is { } date)
+        {
+            var until = date - DateTimeOffset.UtcNow;
+            if (until > TimeSpan.Zero)
+                return until;
+        }
+
+        return DefaultRetryDelay;
+    }
+
+    private static async Task<string> ReadResponseSnippetAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        var body = await response.Content.ReadAsStringAsync(ct);
+        body = string.Join(' ', body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return body.Length <= 500 ? body : $"{body[..500]}...";
     }
 
     private static string BuildQuery(BoundingBox bbox, LayerDefinition layer)
@@ -156,17 +185,19 @@ public sealed class OverpassClient
             tagFilter = $"[\"{layer.Key}\"]";
         }
 
+        var elementType = layer.ExpectedKind == GeometryKind.Point ? "node" : "way";
+
         var union = layer.IncludeRelations
             ? $"""
               (
-                way{tagFilter}({bboxStr});
+                {elementType}{tagFilter}({bboxStr});
                 relation{tagFilter}({bboxStr});
               );
               out geom;
               """
             : $"""
               (
-                way{tagFilter}({bboxStr});
+                {elementType}{tagFilter}({bboxStr});
               );
               out geom;
               """;

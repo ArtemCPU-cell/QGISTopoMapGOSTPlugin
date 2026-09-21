@@ -1,25 +1,22 @@
-# Локальные тестовые данные (офлайн-режим)
+﻿# Offline Overpass sample data
 
-Если положить сюда файл `<имя_слоя>.json` (например `roads.json`), модуль
-возьмёт данные из него и не будет обращаться к живому Overpass вообще.
-Это нужно, чтобы разрабатывать и тестировать остальной пайплайн (парсинг →
-геометрии → запись shapefile), не завися от нестабильности публичного сервера.
+These are raw JSON responses from Overpass for bbox `55.75,37.60,55.77,37.64` (central Moscow), downloaded on **21 September 2026**. They are used by `dotnet run -- --offline ...` so geometry/shapefile work can be tested without a public Overpass server.
 
-## Как получить файл
+| File | Query result |
+| --- | ---: |
+| `roads.json` | 10,432 ways |
+| `buildings.json` | 1,905 ways |
+| `water.json` | 12 ways |
+| `vegetation.json` | 0 ways |
+| `places.json` | 2 nodes |
 
-1. Открой https://overpass-turbo.eu (у тебя уже подтверждённо работает в браузере).
-2. Вставь один из запросов ниже (они соответствуют слоям и bbox из `Program.cs`
-   — центр Москвы, при необходимости поменяй bbox под свой регион).
-3. Нажми "Run".
-4. Открой вкладку **Data** справа (не "Export" — там уже готовый JSON, ровно
-   в том формате, который отдаёт сам Overpass API).
-5. Скопируй содержимое целиком, сохрани как `roads.json` / `buildings.json` /
-   `water.json` / `forest.json` в эту папку.
+`vegetation.json` is deliberately an actual empty Overpass response for this bbox and the current `landuse` value set, not a placeholder.
 
-## Запросы (те же, что генерирует сам код, для консистентности)
+The queries below are generated from `LayerDefinition` in `Program.cs`. A point layer is queried as `node`; line and polygon layers are queried as `way`.
 
-**roads.json** (`highway=*`):
-```
+## roads.json
+
+```overpass
 [out:json][timeout:90];
 (
   way["highway"](55.75,37.60,55.77,37.64);
@@ -27,8 +24,9 @@
 out geom;
 ```
 
-**buildings.json** (`building=*`):
-```
+## buildings.json
+
+```overpass
 [out:json][timeout:90];
 (
   way["building"](55.75,37.60,55.77,37.64);
@@ -36,27 +34,32 @@ out geom;
 out geom;
 ```
 
-**water.json** (`natural=water`):
-```
+## water.json
+
+```overpass
 [out:json][timeout:90];
 (
-  way["natural"="water"](55.75,37.60,55.77,37.64);
+  way["natural"~"^(water|river|stream|canal)$"](55.75,37.60,55.77,37.64);
 );
 out geom;
 ```
 
-**forest.json** (`landuse=forest`):
-```
+## vegetation.json
+
+```overpass
 [out:json][timeout:90];
 (
-  way["landuse"="forest"](55.75,37.60,55.77,37.64);
+  way["landuse"~"^(forest|wood|scrub|grassland|meadow|farmland|sand|beach|rock|cliff|bare_rock|vineyard|orchard|cemetery)$"](55.75,37.60,55.77,37.64);
 );
 out geom;
 ```
 
-## Совет по bbox для теста
+## places.json
 
-Если хочешь, чтобы запрос в overpass-turbo точно не упал по таймауту/памяти
-(как сейчас падает у публичных зеркал) — возьми bbox поменьше, например
-один квартал, а не весь центр города. Для проверки, что весь пайплайн вообще
-работает (парсинг → geometry → shapefile), хватит и десятка объектов.
+```overpass
+[out:json][timeout:90];
+(
+  node["place"~"^(city|town|village|hamlet|suburb|borough)$"](55.75,37.60,55.77,37.64);
+);
+out geom;
+```
