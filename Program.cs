@@ -125,14 +125,23 @@ var client = new OverpassClient();
 
 if (!opts.NoDem)
 {
-    Console.WriteLine("DEM: запрашиваю SRTM 30м через opentopodata.org...");
     try
     {
-        var src = new SrtmSource();
-        // Шаг сетки ~ 0.0003° ≈ 33 м (примерный шаг SRTM).
-        var stepDeg = 0.0003;
-        var progress = new Progress<string>(m => Console.WriteLine($"  {m}"));
-        var grid = await src.FetchGridAsync(opts.BBox, stepDeg, progress);
+        DemGrid grid;
+        if (!string.IsNullOrWhiteSpace(opts.DemFile))
+        {
+            Console.WriteLine($"DEM: локальный GeoTIFF DTM {opts.DemFile}");
+            grid = GeoTiffDtmSource.Load(opts.DemFile, opts.BBox);
+        }
+        else
+        {
+            Console.WriteLine("DEM: preview SRTM 30м через opentopodata.org...");
+            // Шаг сетки ~ 0.0003° ≈ 33 м (примерный шаг SRTM).
+            var stepDeg = 0.0003;
+            var progress = new Progress<string>(m => Console.WriteLine($"  {m}"));
+            var src = new SrtmSource();
+            grid = await src.FetchGridAsync(opts.BBox, stepDeg, progress);
+        }
         var contours = ContourGenerator.Build(grid, profile.ContourIntervalMeters);
         WriteFeaturesWithStyle(opts.OutputDir, "contours", contours.Lines,
             SldStyleFactory.Contours(index: false));
@@ -140,6 +149,11 @@ if (!opts.NoDem)
     catch (Exception ex)
     {
         Console.Error.WriteLine($"DEM: ошибка — {ex.Message}");
+        if (!string.IsNullOrWhiteSpace(opts.DemFile))
+        {
+            Console.Error.WriteLine("DEM: supplied DTM is mandatory; карта не может быть помечена успешно.");
+            return 2;
+        }
     }
 }
 else

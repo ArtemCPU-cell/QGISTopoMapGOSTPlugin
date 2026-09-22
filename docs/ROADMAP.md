@@ -1,4 +1,4 @@
-﻿# Roadmap: QGIS Topographic Map Plugin
+# Roadmap: QGIS Topographic Map Plugin
 
 Дата фиксации: **22 сентября 2026 года**
 

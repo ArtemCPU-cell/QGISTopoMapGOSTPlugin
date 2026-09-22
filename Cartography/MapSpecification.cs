@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using OsmToShapefile.Cli;
 using OsmToShapefile.Scale;
 
@@ -23,7 +24,9 @@ public sealed record MapSpecification(
         $"1:{ScaleProfile.For(options.Scale).ScaleDenominator}",
         options.TargetSrs,
         new[] { "roads", "buildings", "water", "vegetation", "settlements", "contours" },
-        CartographicQualityMode.Preview,
+        !options.NoDem && !string.IsNullOrWhiteSpace(options.DemFile)
+            ? CartographicQualityMode.ProductionCandidate
+            : CartographicQualityMode.Preview,
         new[]
         {
             "GOST R 51605-2023",
@@ -45,15 +48,29 @@ public sealed record DataSourceProfile(
 {
     public static DataSourceProfile From(RunOptions options) => new(
         options.Offline ? "Bundled Overpass JSON cache" : "Public Overpass API mirrors",
-        options.NoDem ? "Not requested" : "OpenTopoData SRTM 30 m preview service",
-        options.NoDem ? null : 30d,
-        CartographicQualityMode.Preview,
+        options.NoDem
+            ? "Not requested"
+            : string.IsNullOrWhiteSpace(options.DemFile)
+                ? "OpenTopoData SRTM 30 m preview service"
+                : $"Supplied GeoTIFF DTM: {Path.GetFullPath(options.DemFile)}",
+        options.NoDem || !string.IsNullOrWhiteSpace(options.DemFile)
+            ? null
+            : 30d,
+        !options.NoDem && !string.IsNullOrWhiteSpace(options.DemFile)
+            ? CartographicQualityMode.ProductionCandidate
+            : CartographicQualityMode.Preview,
         options.NoDem
             ? new[] { "Relief was disabled by --no-dem." }
+            : string.IsNullOrWhiteSpace(options.DemFile)
+                ? new[]
+                {
+                    "OSM and SRTM 30 m are preview data sources, not authoritative production survey data.",
+                    "A supplied, documented terrain DTM is required before claiming production or regulatory conformance.",
+                }
             : new[]
             {
-                "OSM and SRTM 30 m are preview data sources, not authoritative production survey data.",
-                "A supplied, documented terrain DTM is required before claiming production or regulatory conformance.",
+                "The supplied DTM is checked for GeoTIFF structure, WGS84 CRS and bbox coverage.",
+                "Vertical datum and survey accuracy must still be documented by the data owner.",
             });
 }
 
@@ -107,6 +124,7 @@ public static class MapResultWriter
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
         }));
         return path;
     }
@@ -117,10 +135,10 @@ public static class MapResultWriter
             return 0;
 
         using var stream = File.OpenRead(path);
+        stream.Seek(4, SeekOrigin.Begin);
         Span<byte> count = stackalloc byte[4];
         if (stream.Read(count) != 4)
             return 0;
         return System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(count);
     }
 }
-

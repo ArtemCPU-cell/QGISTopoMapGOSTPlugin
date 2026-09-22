@@ -1,4 +1,4 @@
-﻿# Data quality and DEM policy
+# Data quality and DEM policy
 
 ## Current state
 
@@ -24,7 +24,7 @@ preferably derived from local survey, LiDAR or official photogrammetry, with:
 1. Preview sources are labelled as `Preview` in `map-result.json`.
 2. The engine must not claim GOST compliance solely because an SLD resembles a
    conventional map style.
-3. A future `supplied DTM` mode will accept a local raster and reject missing
+3. The `supplied DTM` mode accepts a local raster and rejects missing
    CRS, missing vertical metadata, insufficient coverage or unsupported raster
    types before generating production contours.
 4. The user may explicitly disable relief with `--no-dem`; the result report then
@@ -32,6 +32,20 @@ preferably derived from local survey, LiDAR or official photogrammetry, with:
 5. Contours crossing the bbox boundary remain open. Closed geometry is not a
    requirement for every contour; artificially closing clipped contours would
    create false terrain.
+
+## Current supplied DTM implementation
+
+The engine accepts `--dem-file <path>` or `demFile` in request v1. It currently
+accepts a deliberately narrow, safe subset: a single-band, uncompressed,
+north-up GeoTIFF encoded as EPSG:4326 with ModelPixelScale, ModelTiepoint and
+GeoKeyDirectory tags. It verifies that the raster covers the requested bbox.
+
+This narrow subset is intentional for the first implementation: a projected,
+compressed or tiled GeoTIFF is rejected rather than being decoded incorrectly.
+Support for common production GeoTIFF variants belongs to the next
+Infrastructure iteration. A supplied file changes the quality label to
+`productionCandidate`, but the report still states that vertical datum and
+survey accuracy must be supplied by the data owner.
 
 ## Layer roadmap
 

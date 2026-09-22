@@ -21,6 +21,7 @@ public sealed class GenerateTopographicMapRequest
     public string OutputDirectory { get; init; } = "output";
     public bool OfflineOsm { get; init; }
     public bool NoDem { get; init; }
+    public string? DemFile { get; init; }
     public bool QgisProject { get; init; } = true;
 
     public static GenerateTopographicMapRequest Load(string path)
@@ -39,6 +40,8 @@ public sealed class GenerateTopographicMapRequest
             throw new ArgumentException($"Unsupported operation '{Operation}'.");
         if (Bbox.Length != 4)
             throw new ArgumentException("Request property 'bbox' must be [south, west, north, east].");
+        if (NoDem && !string.IsNullOrWhiteSpace(DemFile))
+            throw new ArgumentException("'noDem' cannot be combined with 'demFile'.");
 
         var bbox = new BoundingBox(Bbox[0], Bbox[1], Bbox[2], Bbox[3]);
         if (bbox.South >= bbox.North || bbox.West >= bbox.East)
@@ -52,6 +55,7 @@ public sealed class GenerateTopographicMapRequest
             OfflineOsm,
             NoDem,
             QgisProject,
+            DemFile,
             responsePath,
             Version);
     }

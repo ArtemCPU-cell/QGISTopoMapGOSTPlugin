@@ -21,6 +21,7 @@ public static class ArgsParser
         bool offline = false;
         bool noDem = false;
         bool qgis = false;
+        string? demFile = null;
         string? requestPath = null;
         string? responsePath = null;
 
@@ -46,6 +47,9 @@ public static class ArgsParser
                 case "--no-dem":
                     noDem = true;
                     break;
+                case "--dem-file":
+                    demFile = Require(args, ref i, "--dem-file");
+                    break;
                 case "--qgis-project":
                     qgis = true;
                     break;
@@ -63,7 +67,7 @@ public static class ArgsParser
         if (requestPath is not null)
         {
             if (args.Any(a => a is "--bbox" or "--scale" or "--output" or "--srs" or
-                              "--offline" or "--no-dem" or "--qgis-project"))
+                              "--offline" or "--no-dem" or "--dem-file" or "--qgis-project"))
             {
                 throw new ArgumentException("--request cannot be combined with map generation options.");
             }
@@ -75,6 +79,8 @@ public static class ArgsParser
             throw new ArgumentException($"Не задан --bbox.\n{RunOptions.Usage}");
         if (scale is null)
             throw new ArgumentException($"Не задан --scale.\n{RunOptions.Usage}");
+        if (noDem && !string.IsNullOrWhiteSpace(demFile))
+            throw new ArgumentException("--no-dem нельзя использовать вместе с --dem-file.");
 
         var parts = bbox.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 4)
@@ -91,7 +97,7 @@ public static class ArgsParser
         if (bb.West >= bb.East)
             throw new ArgumentException($"West ({bb.West}) должна быть меньше East ({bb.East})");
 
-        return new RunOptions(bb, ScaleProfile.Parse(scale), output, srs, offline, noDem, qgis, responsePath);
+        return new RunOptions(bb, ScaleProfile.Parse(scale), output, srs, offline, noDem, qgis, demFile, responsePath);
     }
 
     private static string Require(string[] args, ref int i, string flag)

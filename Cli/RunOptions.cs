@@ -8,6 +8,7 @@ public sealed record RunOptions(
     bool Offline,
     bool NoDem,
     bool QgisProject,
+    string? DemFile = null,
     string? ResponsePath = null,
     int ContractVersion = 1)
 {
@@ -26,6 +27,7 @@ public sealed record RunOptions(
           --srs <epsg>         целевая метрическая SRS (по умолчанию EPSG:32637)
           --offline            не обращаться к Overpass; читать sample-data/*.json
           --no-dem             пропустить загрузку SRTM и построение горизонталей
+          --dem-file <file>    локальный GeoTIFF terrain DTM вместо preview DEM
           --qgis-project       сгенерировать .qgs со ссылками на слои
           --request <file>     JSON-запрос контракта версии 1 для запуска из QGIS adapter
           --response <file>    путь JSON-отчёта о созданных слоях (по умолчанию map-result.json)
