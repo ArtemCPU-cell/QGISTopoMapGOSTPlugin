@@ -7,7 +7,9 @@ public sealed record RunOptions(
     string TargetSrs,
     bool Offline,
     bool NoDem,
-    bool QgisProject)
+    bool QgisProject,
+    string? ResponsePath = null,
+    int ContractVersion = 1)
 {
     public static string Usage => """
         OsmToShapeFile — топокарта по OSM данным.
@@ -25,6 +27,8 @@ public sealed record RunOptions(
           --offline            не обращаться к Overpass; читать sample-data/*.json
           --no-dem             пропустить загрузку SRTM и построение горизонталей
           --qgis-project       сгенерировать .qgs со ссылками на слои
+          --request <file>     JSON-запрос контракта версии 1 для запуска из QGIS adapter
+          --response <file>    путь JSON-отчёта о созданных слоях (по умолчанию map-result.json)
 
         Пример:
           dotnet run -- --bbox 55.75,37.60,55.77,37.64 --scale 25k --output ./out/moscow

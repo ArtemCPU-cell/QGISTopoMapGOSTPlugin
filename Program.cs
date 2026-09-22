@@ -3,6 +3,7 @@ using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Simplify;
 using OsmToShapefile.Buildings;
+using OsmToShapefile.Cartography;
 using OsmToShapefile.Cli;
 using OsmToShapefile.Dem;
 using OsmToShapefile.Geo.Classifier;
@@ -32,7 +33,10 @@ Console.WriteLine(
 
 var profile = ScaleProfile.For(opts.Scale);
 var reprojector = new Reprojector(opts.TargetSrs);
+var mapSpecification = MapSpecification.From(opts);
+var dataSourceProfile = DataSourceProfile.From(opts);
 Console.WriteLine($"Целевая SRS: {opts.TargetSrs}, WKT длина {reprojector.TargetWkt.Length} симв.");
+Console.WriteLine($"Режим качества: {mapSpecification.QualityMode}; источник OSM: {dataSourceProfile.Osm}");
 
 var roadsLayer = new LayerDefinition("roads", "highway", null, GeometryKind.Line, ExtraValues: null, IncludeRelations: false);
 var buildingsLayer = new LayerDefinition(
@@ -160,6 +164,8 @@ if (opts.QgisProject)
         (Xmin: xmin, Ymin: ymin, Xmax: xmax, Ymax: ymax));
 }
 
+var resultPath = MapResultWriter.WriteSuccess(opts, mapSpecification, dataSourceProfile);
+Console.WriteLine($"Отчёт карты -> {resultPath}");
 Console.WriteLine("Готово.");
 return 0;
 

@@ -1,5 +1,6 @@
 using OsmToShapefile.Overpass;
 using OsmToShapefile.Scale;
+using OsmToShapefile.Contracts;
 
 namespace OsmToShapefile.Cli;
 
@@ -20,6 +21,8 @@ public static class ArgsParser
         bool offline = false;
         bool noDem = false;
         bool qgis = false;
+        string? requestPath = null;
+        string? responsePath = null;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -46,9 +49,26 @@ public static class ArgsParser
                 case "--qgis-project":
                     qgis = true;
                     break;
+                case "--request":
+                    requestPath = Require(args, ref i, "--request");
+                    break;
+                case "--response":
+                    responsePath = Require(args, ref i, "--response");
+                    break;
                 default:
                     throw new ArgumentException($"Неизвестный аргумент: {args[i]}\n{RunOptions.Usage}");
             }
+        }
+
+        if (requestPath is not null)
+        {
+            if (args.Any(a => a is "--bbox" or "--scale" or "--output" or "--srs" or
+                              "--offline" or "--no-dem" or "--qgis-project"))
+            {
+                throw new ArgumentException("--request cannot be combined with map generation options.");
+            }
+
+            return GenerateTopographicMapRequest.Load(requestPath).ToRunOptions(responsePath);
         }
 
         if (bbox is null)
@@ -71,7 +91,7 @@ public static class ArgsParser
         if (bb.West >= bb.East)
             throw new ArgumentException($"West ({bb.West}) должна быть меньше East ({bb.East})");
 
-        return new RunOptions(bb, ScaleProfile.Parse(scale), output, srs, offline, noDem, qgis);
+        return new RunOptions(bb, ScaleProfile.Parse(scale), output, srs, offline, noDem, qgis, responsePath);
     }
 
     private static string Require(string[] args, ref int i, string flag)
